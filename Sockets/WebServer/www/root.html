@@ -1,15 +1,42 @@
 <html>
-	<head>
-		<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
-	</head>
-	<body>
-		<h3>You can make the following GET requests<h3>
-		<ul>
-			<li>/file/sample.html -- returns the content of the file sample.html</li>
-			<li>/json -- returns a json of the /random request</a></li>
-			<li>/random -- returns index.html</a></li>
-		</ul>
-		<h3>File Structure in www (you can use /file/www/FILENAME):</h3>
-		${links}
-	</body>
+<head>
+	<link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+</head>
+<body>
+<h3>You can make the following GET requests</h3>
+<ul>
+	<li>/file/sample.html -- returns the content of the file sample.html</li>
+	<li>/json -- returns a JSON response for the /random request</li>
+	<li>/random -- returns index.html</li>
+	<li>/multiply -- multiplies two integer inputs</li>
+	<li>/github -- returns GitHub repo information including full_name, ID, and owner login</li>
+	<li>/grade -- calculates a percentage and letter grade from a score and total</li>
+	<li>/password -- checks password strength using a password and minimum length</li>
+</ul>
+
+<h3>Exact Example URLs</h3>
+<ul>
+	<li><a href="/multiply?num1=3&num2=4">/multiply?num1=3&num2=4</a></li>
+	<li><a href="/github?query=users/amehlhase316/repos">/github?query=users/amehlhase316/repos</a></li>
+	<li><a href="/grade?score=87&total=100">/grade?score=87&total=100</a></li>
+	<li><a href="/password?password=Dragon123!&minLength=10">/password?password=Dragon123!&minLength=10</a></li>
+</ul>
+
+<h3>Custom Request Descriptions</h3>
+
+<h4>Grade Checker</h4>
+<p>
+	The grade request takes two arguments: score and total. It calculates the percentage earned and returns a letter grade.
+	The score must be between 0 and the total, and the total must be greater than 0.
+</p>
+
+<h4>Password Strength Checker</h4>
+<p>
+	The password request takes two arguments: password and minLength. It checks whether the password has an uppercase letter,
+	a lowercase letter, a number, a special character, and meets the required minimum length.
+</p>
+
+<h3>File Structure in www (you can use /file/www/FILENAME):</h3>
+${links}
+</body>
 </html>

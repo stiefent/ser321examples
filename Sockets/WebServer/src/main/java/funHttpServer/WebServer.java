@@ -17,6 +17,7 @@ write a response back
 package funHttpServer;
 
 import java.io.*;
+import org.json.*;
 import java.net.*;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -196,26 +197,37 @@ class WebServer {
         } else if (request.contains("multiply?")) {
           // This multiplies two numbers, there is NO error handling, so when
           // wrong data is given this just crashes
+          try {
+            Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+            // extract path parameters
+            query_pairs = splitQuery(request.replace("multiply?", ""));
 
-          Map<String, String> query_pairs = new LinkedHashMap<String, String>();
-          // extract path parameters
-          query_pairs = splitQuery(request.replace("multiply?", ""));
+            if (query_pairs.isEmpty() || !query_pairs.containsKey("num1") || !query_pairs.containsKey("num2")) {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Error: Missing required parameters. Please provide num1 and num2.\n");
+            } else {
+              // extract required fields from parameters
+              Integer num1 = Integer.parseInt(query_pairs.get("num1"));
+              Integer num2 = Integer.parseInt(query_pairs.get("num2"));
 
-          // extract required fields from parameters
-          Integer num1 = Integer.parseInt(query_pairs.get("num1"));
-          Integer num2 = Integer.parseInt(query_pairs.get("num2"));
+              // do math
+              Integer result = num1 * num2;
 
-          // do math
-          Integer result = num1 * num2;
+              // Generate response
+              builder.append("HTTP/1.1 200 OK\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Result is: " + result);
 
-          // Generate response
-          builder.append("HTTP/1.1 200 OK\n");
-          builder.append("Content-Type: text/html; charset=utf-8\n");
-          builder.append("\n");
-          builder.append("Result is: " + result);
-
-          // TODO: Include error handling here with a correct error code and
-          // a response that makes sense
+            }
+          } catch (NumberFormatException e) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Error: num1 and num2 must both be valid integers.");
+          }
 
         } else if (request.contains("github?")) {
           // pulls the query from the request and runs it with GitHub's REST API
@@ -228,16 +240,188 @@ class WebServer {
 
           Map<String, String> query_pairs = new LinkedHashMap<String, String>();
           query_pairs = splitQuery(request.replace("github?", ""));
-          String json = fetchURL("https://api.github.com/" + query_pairs.get("query"));
-          System.out.println(json);
 
-          builder.append("HTTP/1.1 200 OK\n");
-          builder.append("Content-Type: text/html; charset=utf-8\n");
-          builder.append("\n");
-          builder.append("Check the todos mentioned in the Java source file");
-          // TODO: Parse the JSON returned by your fetch and create an appropriate
-          // response based on what the assignment document asks for
+          if (!query_pairs.containsKey("query") || query_pairs.get("query") == null) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Error: Missing required parameters. Please provide query and query pair.");
+          } else {
+            String query = query_pairs.get("query");
 
+            if (!query.matches("users/[a-zA-Z0-9]+/repos")) {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Error: Query must be in the format users/USERNAME/repos.");
+            } else {
+              String json = fetchURL("https://api.github.com/" + query);
+
+              if (json == null || json.isEmpty()) {
+                builder.append("HTTP/1.1 502 Bad Gateway\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("Error: Could not fetch github repo.");
+              } else {
+                try {
+                  JSONArray repoArray = new JSONArray(json);
+
+                  builder.append("HTTP/1.1 200 OK\n");
+                  builder.append("Content-Type: text/html; charset=utf-8\n");
+                  builder.append("\n");
+
+                  builder.append("<html><body>");
+                  builder.append("<h1>Github Repositories</h1>");
+
+                  for (int i = 0; i < repoArray.length(); i++) {
+                    JSONObject repo = repoArray.getJSONObject(i);
+
+                    String fullName = repo.getString("full_name");
+                    int id = repo.getInt("id");
+
+                    JSONObject owner = repo.getJSONObject("owner");
+                    String login = owner.getString("login");
+
+                    builder.append("<p>");
+                    builder.append("<strong>Full Name:</strong> " + fullName + "<br>");
+                    builder.append("<strong>ID:</strong> " + id + "<br>");
+                    builder.append("<strong>Owner Login:</strong> " + login + "<br>");
+                    builder.append("</p>");
+                  }
+
+                  builder.append("</body></html>");
+                } catch (JSONException e) {
+                  builder.append("HTTP/1.1 500 Internal Server Error\n");
+                  builder.append("Content-Type: text/html; charset=utf-8\n");
+                  builder.append("\n");
+                  builder.append("Error: GitHub returned data, but the server could not parse it as expected");
+                }
+              }
+            }
+          }
+        } else if (request.contains("grade?")) {
+          Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+          query_pairs = splitQuery(request.replace("grade?", ""));
+
+          if (!query_pairs.containsKey("score") || !query_pairs.containsKey("total")) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Error: Missing required parameters. Please provide score and total.");
+          } else {
+            try {
+              double score = Double.parseDouble(query_pairs.get("score"));
+              double total = Double.parseDouble(query_pairs.get("total"));
+
+              if (total <= 0) {
+                builder.append("HTTP/1.1 400 Bad Request\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("Error: Total score must be greater than zero.");
+              } else if (score < 0 || score > total) {
+                builder.append("HTTP/1.1 400 Bad Request\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("Error: Total score must be between 0 and total.");
+              } else {
+                double percentage = (score / total) * 100;
+                String letterGrade;
+
+                if (percentage >= 90) {
+                  letterGrade = "A";
+                } else if (percentage >= 80) {
+                  letterGrade = "B";
+                } else if (percentage >= 70) {
+                  letterGrade = "C";
+                } else if (percentage >= 60) {
+                  letterGrade = "D";
+                } else {
+                  letterGrade = "F";
+                }
+
+                builder.append("HTTP/1.1 200 OK\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("<html><body>");
+                builder.append("<h1>Grade Result</h1>");
+                builder.append("<p>Score: " + score + "</p>");
+                builder.append("<p>Total: " + total + "</p>");
+                builder.append("<p>Percentage: " + String.format("%.2f", percentage) + "%</p>");
+                builder.append("<p>Letter Grade: " + letterGrade + "</p>");
+                builder.append("</body></html>");
+              }
+
+            } catch (NumberFormatException e) {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Error: score and total must be valid numbers");
+            }
+          }
+
+        } else if (request.contains("password?")) {
+
+          Map<String, String> query_pairs = new LinkedHashMap<String, String>();
+          query_pairs = splitQuery(request.replace("password?", ""));
+
+          if (!query_pairs.containsKey("password") || !query_pairs.containsKey("minLength")) {
+            builder.append("HTTP/1.1 400 Bad Request\n");
+            builder.append("Content-Type: text/html; charset=utf-8\n");
+            builder.append("\n");
+            builder.append("Error: Missing required parameters. Please provide password and minLength.");
+          } else {
+            try {
+              String password = query_pairs.get("password");
+              int minLength = Integer.parseInt(query_pairs.get("minLength"));
+
+              if (minLength < 1 || minLength > 100) {
+                builder.append("HTTP/1.1 400 Bad Request\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("Error: Min length must be between 1 and 100.");
+              } else {
+                boolean hasUpper = false;
+                boolean hasLower = false;
+                boolean hasDigit = false;
+                boolean hasSpecial = false;
+
+                for (int i = 0; i < password.length(); i++) {
+                  char c = password.charAt(i);
+
+                  if (Character.isUpperCase(c)) {
+                    hasUpper = true;
+                  } else if (Character.isLowerCase(c)) {
+                    hasLower = true;
+                  } else if (Character.isDigit(c)) {
+                    hasDigit = true;
+                  } else {
+                    hasSpecial = true;
+                  }
+                }
+
+                boolean longEnough = password.length() >= minLength;
+                boolean strong = longEnough && hasUpper && hasLower && hasDigit && hasSpecial;
+
+                builder.append("HTTP/1.1 200 OK\n");
+                builder.append("Content-Type: text/html; charset=utf-8\n");
+                builder.append("\n");
+                builder.append("<html><body>");
+                builder.append("<h1>Password Strength</h1>");
+                builder.append("<p>Minimum length: " + minLength + "</p>");
+                builder.append("<p>Actual length: " + password.length() + "</p>");
+                builder.append("<p>Has Upper Letter: " + hasUpper + "</p>");
+                builder.append("<p>Has Lower Letter: " + hasLower + "</p>");
+                builder.append("<p>Has Number: " + hasDigit + "</p>");
+                builder.append("<p>Has Special Character: " + hasSpecial + "</p>");
+                builder.append("</body></html>");
+              }
+            } catch (NumberFormatException e) {
+              builder.append("HTTP/1.1 400 Bad Request\n");
+              builder.append("Content-Type: text/html; charset=utf-8\n");
+              builder.append("\n");
+              builder.append("Error: minLength must be a valid integer");
+            }
+          }
         } else {
           // if the request is not recognized at all
 
